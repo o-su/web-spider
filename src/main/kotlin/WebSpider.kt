@@ -2,46 +2,54 @@ package webSpider
 
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
+import java.util.concurrent.Executors
+import kotlinx.coroutines.*
 
-fun main () {
-    val webSpider = WebSpider(WebSpiderSettings(userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.246"))
+ fun main() = runBlocking {
+    val webSpider = WebSpider(WebSpiderSettings(userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (dispatcherKHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.246", threadCount = 4))
 
-    webSpider.run("https://kotlinlang.org/")
-}
+     webSpider.run("https://kotlinlang.org/")
+ }
 
-data class WebSpiderSettings(val userAgent: String)
+data class WebSpiderSettings(val userAgent: String, val threadCount: Int)
 
 class WebSpider(private val settings: WebSpiderSettings) {
     private val index: ArrayList<String> = ArrayList()
     private val queue: ArrayList<String> = ArrayList()
-    private var running: Boolean = false
+    private var running: Boolean = true
+    private val dispatcher: ExecutorCoroutineDispatcher = Executors.newFixedThreadPool(settings.threadCount).asCoroutineDispatcher()
 
-    fun run(url: String) {
-        this.index.add(url)
-        this.queue.add(url)
-        this.crawl()
-        this.running = true
+    suspend fun run(url: String) {
+        index.add(url)
+        queue.add(url)
+        running = true
+        processQueue()
     }
 
     fun stop() {
-        this.running = false
+        running = false
+        this.dispatcher.close()
     }
 
     fun getIndex(): ArrayList<String> {
         return this.index
     }
 
-    private fun crawl() {
-        val url = this.getFirstUrlFromQueue()
-        println(url)
+    private suspend fun processQueue() {
+        while(queue.isNotEmpty() && running) {
+            crawl()
+        }
+    }
 
-        if (url.isNotEmpty() && this.running) {
-            val content: Document = this.getPageContent(url)
-            val links = this.parseLinksFromPageContent(content)
+    private suspend fun crawl() =  withContext(this.dispatcher) {
+        val url = getFirstUrlFromQueue()
 
-            this.addLinksToIndex(links)
-            this.addLinksToQueue(links)
-            this.crawl()
+        if (!url.isNullOrEmpty()) {
+            val content: Document = getPageContent(url)
+            val links = parseLinksFromPageContent(content)
+
+            addLinksToIndex(links)
+            addLinksToQueue(links)
          }
     }
 
@@ -67,7 +75,11 @@ class WebSpider(private val settings: WebSpiderSettings) {
         }
     }
 
-    private fun getFirstUrlFromQueue(): String {
-        return this.queue.removeAt(0)
+    private fun getFirstUrlFromQueue(): String? {
+        if (this.queue.isNotEmpty()) {
+            return this.queue.removeAt(0)
+        }
+
+        return null
     }
 }

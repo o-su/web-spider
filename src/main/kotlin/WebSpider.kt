@@ -6,7 +6,10 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
+import org.jsoup.nodes.Element
 import java.io.IOException
+import java.net.URI
+import java.net.URISyntaxException
 import java.util.concurrent.Executors
 
 fun main() = runBlocking {
@@ -15,14 +18,22 @@ fun main() = runBlocking {
             userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (dispatcherKHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.246",
             threadCount = 4,
             maxDepth = 3,
-            debug = true
+            debug = true,
+            domainRestriction = "kotlinlang.org"
         )
     )
 
-     webSpider.run("https://kotlinlang.org/")
- }
+    webSpider.run("https://kotlinlang.org/")
+}
 
-data class WebSpiderSettings(val userAgent: String, val threadCount: Int, val maxDepth: Short?, val debug: Boolean)
+data class WebSpiderSettings(
+    val userAgent: String,
+    val threadCount: Int,
+    val maxDepth: Short?,
+    val debug: Boolean,
+    val domainRestriction: String?
+)
+
 data class Link(val url: String, val depth: Int)
 
 class WebSpider(private val settings: WebSpiderSettings) {
@@ -93,7 +104,30 @@ class WebSpider(private val settings: WebSpiderSettings) {
     }
 
     private fun parseLinksFromPageContent(content: Document): List<String> {
-        return content.select("a[href]").map { link -> link.absUrl("href") }
+        return this.filterLinks(content.select("a[href]"))
+                .map { link ->
+                    println(link.absUrl("href"))
+                    link.absUrl("href") }
+    }
+
+    private fun filterLinks(links: List<Element>): List<Element> {
+        return links.filter { link -> this.isLinkAllowedForIndexing(link) }
+    }
+
+    private fun isLinkAllowedForIndexing(link: Element): Boolean {
+        return try {
+            val url: String = link.absUrl("href")
+            val uri = URI(url)
+            val hostname: String? = uri.host
+            val domainRestrictionActive: Boolean = this.settings.domainRestriction !== null
+            val domainSatisfiesRestriction: Boolean = domainRestrictionActive && hostname !== null && hostname == this.settings.domainRestriction
+            val urlAlreadyIndexed: Boolean = this.index.contains(url)
+
+            !urlAlreadyIndexed && (!domainRestrictionActive || domainSatisfiesRestriction)
+        } catch (exception: URISyntaxException) {
+            this.logError(exception.toString())
+            false
+        }
     }
 
     private fun addLinksToIndex(links: List<String>) {

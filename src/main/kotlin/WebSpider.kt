@@ -64,13 +64,13 @@ class WebSpider(private val settings: WebSpiderSettings) {
     }
 
     private suspend fun processQueue() {
-        while(queue.isNotEmpty() && running) {
+        while (queue.isNotEmpty() && running) {
             crawl()
         }
         stop()
     }
 
-    private suspend fun crawl() =  withContext(this.dispatcher) {
+    private suspend fun crawl() = withContext(this.dispatcher) {
         val link = getFirsLinkFromQueue()
 
         if (link !== null && settings.maxDepth !== null && link.depth <= settings.maxDepth) {
@@ -87,7 +87,7 @@ class WebSpider(private val settings: WebSpiderSettings) {
                 addLinksToIndex(urls)
                 addLinksToQueue(urls.map { url -> Link(url, depth) })
             }
-         }
+        }
     }
 
     private fun getPageContent(url: String): Document? {
@@ -105,9 +105,10 @@ class WebSpider(private val settings: WebSpiderSettings) {
 
     private fun parseLinksFromPageContent(content: Document): List<String> {
         return this.filterLinks(content.select("a[href]"))
-                .map { link ->
-                    println(link.absUrl("href"))
-                    link.absUrl("href") }
+            .map { link ->
+                println(link.absUrl("href"))
+                link.absUrl("href")
+            }
     }
 
     private fun filterLinks(links: List<Element>): List<Element> {

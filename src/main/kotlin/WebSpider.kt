@@ -4,12 +4,10 @@ import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import java.io.IOException
-import java.net.URI
-import java.net.URISyntaxException
+import java.lang.Exception
+import java.net.*
 import java.util.concurrent.Executors
 
 fun main() = runBlocking {
@@ -19,7 +17,9 @@ fun main() = runBlocking {
             threadCount = 4,
             maxDepth = 3,
             debug = true,
-            domainRestriction = "kotlinlang.org"
+            domainRestriction = "kotlinlang.org",
+            minFileSize = null,
+            maxFileSize = null
         )
     )
 
@@ -31,7 +31,9 @@ data class WebSpiderSettings(
     val threadCount: Int,
     val maxDepth: Short?,
     val debug: Boolean,
-    val domainRestriction: String?
+    val domainRestriction: String?,
+    val minFileSize: Int?,
+    val maxFileSize: Int?
 )
 
 data class Link(val url: String, val depth: Int)
@@ -74,39 +76,30 @@ class WebSpider(private val settings: WebSpiderSettings) {
         val link = getFirsLinkFromQueue()
 
         if (link !== null && settings.maxDepth !== null && link.depth <= settings.maxDepth) {
-            val document: Document? = getPageContent(link.url)
+            try {
+                val fileContent = downloadFile(link.url, settings.minFileSize, settings.maxFileSize)
+                val document: Document? = parseDocument(fileContent)
 
-            if (settings.debug) {
-                println(link.url + link.depth)
-            }
+                if (settings.debug) {
+                    println(link.url + link.depth)
+                }
 
-            if (document !== null) {
-                val urls = parseLinksFromPageContent(document)
-                val depth = link.depth + 1
+                if (document !== null) {
+                    val urls = parseLinksFromPageContent(document)
+                    val depth = link.depth + 1
 
-                addLinksToIndex(urls)
-                addLinksToQueue(urls.map { url -> Link(url, depth) })
+                    addLinksToIndex(urls)
+                    addLinksToQueue(urls.map { url -> Link(url, depth) })
+                }
+            } catch (exception: Exception) {
+                logError(exception.toString())
             }
         }
-    }
-
-    private fun getPageContent(url: String): Document? {
-        val connection = Jsoup.connect(url).userAgent(this.settings.userAgent)
-        var document: Document? = null
-
-        try {
-            document = connection.get()
-        } catch (exception: IOException) {
-            this.logError(exception.toString())
-        }
-
-        return document
     }
 
     private fun parseLinksFromPageContent(content: Document): List<String> {
-        return this.filterLinks(content.select("a[href]"))
+        return this.filterLinks(parseLinksFromDocument(content))
             .map { link ->
-                println(link.absUrl("href"))
                 link.absUrl("href")
             }
     }

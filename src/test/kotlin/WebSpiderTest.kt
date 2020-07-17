@@ -16,7 +16,9 @@ class WebSpiderTest {
                 threadCount = 1,
                 maxDepth = 3,
                 debug = true,
-                domainRestriction = null
+                domainRestriction = null,
+                maxFileSize = null,
+                minFileSize = null
             )
         )
         val url = "https://kotlinlang.org/"

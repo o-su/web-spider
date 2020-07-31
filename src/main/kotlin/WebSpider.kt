@@ -4,6 +4,7 @@ import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import org.apache.commons.io.FilenameUtils
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import java.lang.Exception
@@ -19,7 +20,8 @@ fun main() = runBlocking {
             debug = true,
             domainRestriction = "kotlinlang.org",
             minFileSize = null,
-            maxFileSize = null
+            maxFileSize = null,
+            targetDirectory = "C:\\\\Users\\dell\\Desktop\\crawlerTest\\"
         )
     )
 
@@ -33,7 +35,8 @@ data class WebSpiderSettings(
     val debug: Boolean,
     val domainRestriction: String?,
     val minFileSize: Int?,
-    val maxFileSize: Int?
+    val maxFileSize: Int?,
+    val targetDirectory: String?
 )
 
 data class Link(val url: String, val depth: Int)
@@ -91,10 +94,27 @@ class WebSpider(private val settings: WebSpiderSettings) {
                     addLinksToIndex(urls)
                     addLinksToQueue(urls.map { url -> Link(url, depth) })
                 }
+
+                if (settings.targetDirectory !== null) {
+                    val uri = URI(link.url)
+                    val host: String? = uri.host
+
+                    saveContentToFile(settings.targetDirectory + host, resolveFilename(link.url), document.toString())
+                }
             } catch (exception: Exception) {
                 logError(exception.toString())
             }
         }
+    }
+
+    private fun resolveFilename(url: String): String {
+        val filename = FilenameUtils.getName(url)
+
+        if (filename.isEmpty()) {
+            return "unknown"
+        }
+
+        return filename
     }
 
     private fun parseLinksFromPageContent(content: Document): List<String> {

@@ -1,7 +1,6 @@
 
 import org.junit.Test
-import webSpider.parseDocument
-import webSpider.parseLinksFromDocument
+import webSpider.*
 import kotlin.test.assertEquals
 
 class DocumentUtilsTest {
@@ -17,28 +16,55 @@ class DocumentUtilsTest {
         """
 
         // when
-        val document = parseDocument(content)
+        val document = parseDocument(content, "")
 
         // then
         assertEquals(document.title(), "TestTitle")
     }
 
-    @Test fun parseLinksFromDocumentTest() {
+    @Test fun parseElementsWithHrefAttributesFromDocumentTest() {
         // given
         val content =
             """
         <html>
+            <head>
+                <link rel="stylesheet" type="text/css" href="testStyle.css">
+            </head>
             <body>
                 <a href="#">TestLink</a>
             </body>
         </html>
         """
-        val document = parseDocument(content)
+        val document = parseDocument(content, "")
 
         // when
-        val links = parseLinksFromDocument(document)
+        val elements = parseElementsWithHrefAttributesFromDocument(document)
 
         // then
-        assertEquals(links.first().text(), "TestLink")
+        assertEquals("testStyle.css", elements.first().attr("href"))
+        assertEquals("#", elements[1].attr("href"))
+    }
+
+    @Test fun parseElementsWithSrcAttributesFromDocumentTest() {
+        // given
+        val content =
+            """
+        <html>
+            <head>
+                <script src="testScript.js"></script>
+            </head>
+            <body>
+                <script src="testScriptInsideBody.js"></script>
+            </body>
+        </html>
+        """
+        val document = parseDocument(content, "")
+
+        // when
+        val elements = parseElementsWithSrcAttributesFromDocument(document)
+
+        // then
+        assertEquals("testScript.js", elements.first().attr("src"))
+        assertEquals("testScriptInsideBody.js", elements[1].attr("src"))
     }
 }

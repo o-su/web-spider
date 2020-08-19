@@ -21,7 +21,7 @@ fun main() = runBlocking {
             domainRestriction = "kotlinlang.org",
             minFileSize = null,
             maxFileSize = null,
-            targetDirectory = "C:\\\\Users\\dell\\Desktop\\crawlerTest\\"
+            targetDirectory = null
         )
     )
 
@@ -81,7 +81,7 @@ class WebSpider(private val settings: WebSpiderSettings) {
         if (link !== null && settings.maxDepth !== null && link.depth <= settings.maxDepth) {
             try {
                 val fileContent = downloadFile(link.url, settings.minFileSize, settings.maxFileSize)
-                val document: Document? = parseDocument(fileContent)
+                val document: Document? = parseDocument(fileContent, parseBaseUrlFromFullUrl(link.url))
 
                 if (settings.debug) {
                     println(link.url + link.depth)
@@ -118,10 +118,14 @@ class WebSpider(private val settings: WebSpiderSettings) {
     }
 
     private fun parseLinksFromPageContent(content: Document): List<String> {
-        return this.filterLinks(parseLinksFromDocument(content))
-            .map { link ->
-                link.absUrl("href")
-            }
+        val links = mutableListOf<String>()
+        val elementsWithHrefAttributes = filterLinks(parseElementsWithHrefAttributesFromDocument(content))
+        val elementsWithSrcAttributes = filterLinks(parseElementsWithSrcAttributesFromDocument(content))
+
+        links.addAll(extractHrefAttributesFromElements(elementsWithHrefAttributes))
+        links.addAll(extractSrcAttributesFromElements(elementsWithSrcAttributes))
+
+        return links
     }
 
     private fun filterLinks(links: List<Element>): List<Element> {

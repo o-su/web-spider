@@ -21,7 +21,8 @@ fun main() = runBlocking {
             domainRestriction = "kotlinlang.org",
             minFileSize = null,
             maxFileSize = null,
-            targetDirectory = null
+            targetDirectory = null,
+            allowedFileExtensions = null
         )
     )
 
@@ -36,7 +37,8 @@ data class WebSpiderSettings(
     val domainRestriction: String?,
     val minFileSize: Int?,
     val maxFileSize: Int?,
-    val targetDirectory: String?
+    val targetDirectory: String?,
+    val allowedFileExtensions: ArrayList<String>?
 )
 
 data class Link(val url: String, val depth: Int)
@@ -78,10 +80,11 @@ class WebSpider(private val settings: WebSpiderSettings) {
     private suspend fun crawl() = withContext(this.dispatcher) {
         val link = getFirsLinkFromQueue()
 
-        if (link !== null && settings.maxDepth !== null && link.depth <= settings.maxDepth) {
+        if (link !== null && !isMaxDepthExceeded(link.depth)) {
             try {
                 val fileContent = downloadFile(link.url, settings.minFileSize, settings.maxFileSize)
                 val document: Document? = parseDocument(fileContent, parseBaseUrlFromFullUrl(link.url))
+                val fileExtension: String? = resolveFileExtension(link.url)
 
                 if (settings.debug) {
                     println(link.url + link.depth)
@@ -95,7 +98,7 @@ class WebSpider(private val settings: WebSpiderSettings) {
                     addLinksToQueue(urls.map { url -> Link(url, depth) })
                 }
 
-                if (settings.targetDirectory !== null) {
+                if (settings.targetDirectory !== null && isFileExtensionAllowed(fileExtension)) {
                     val uri = URI(link.url)
                     val host: String? = uri.host
 
@@ -105,6 +108,18 @@ class WebSpider(private val settings: WebSpiderSettings) {
                 logError(exception.toString())
             }
         }
+    }
+
+    private fun isMaxDepthExceeded(depth: Int): Boolean {
+        return settings.maxDepth !== null && depth > settings.maxDepth
+    }
+
+    private fun isFileExtensionAllowed(fileExtension: String?): Boolean {
+        return this.settings.allowedFileExtensions.isNullOrEmpty() || this.settings.allowedFileExtensions.contains(fileExtension)
+    }
+
+    private fun resolveFileExtension(url: String): String {
+        return FilenameUtils.getExtension(url)
     }
 
     private fun resolveFilename(url: String): String {

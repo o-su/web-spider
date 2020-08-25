@@ -16,6 +16,7 @@ class WebSpiderTest {
                 threadCount = 1,
                 maxDepth = 3,
                 debug = true,
+                scriptsDisabled = false,
                 domainRestriction = null,
                 maxFileSize = null,
                 minFileSize = null,

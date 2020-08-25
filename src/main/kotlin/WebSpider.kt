@@ -18,6 +18,7 @@ fun main() = runBlocking {
             threadCount = 4,
             maxDepth = 3,
             debug = true,
+            scriptsDisabled = true,
             domainRestriction = "kotlinlang.org",
             minFileSize = null,
             maxFileSize = null,
@@ -34,6 +35,7 @@ data class WebSpiderSettings(
     val threadCount: Int,
     val maxDepth: Short?,
     val debug: Boolean,
+    val scriptsDisabled: Boolean,
     val domainRestriction: String?,
     val minFileSize: Int?,
     val maxFileSize: Int?,
@@ -83,7 +85,8 @@ class WebSpider(private val settings: WebSpiderSettings) {
         if (link !== null && !isMaxDepthExceeded(link.depth)) {
             try {
                 val fileContent = downloadFile(link.url, settings.minFileSize, settings.maxFileSize)
-                val document: Document? = parseDocument(fileContent, parseBaseUrlFromFullUrl(link.url))
+                val baseUrl = parseBaseUrlFromFullUrl(link.url)
+                val document: Document? = parseDocument(fileContent, baseUrl)
                 val fileExtension: String? = resolveFileExtension(link.url)
 
                 if (settings.debug) {
@@ -101,13 +104,25 @@ class WebSpider(private val settings: WebSpiderSettings) {
                 if (settings.targetDirectory !== null && isFileExtensionAllowed(fileExtension)) {
                     val uri = URI(link.url)
                     val host: String? = uri.host
+                    val processedDocument: Document? = processDocument(document, baseUrl)
 
-                    saveContentToFile(settings.targetDirectory + host, resolveFilename(link.url), document.toString())
+                    saveContentToFile(settings.targetDirectory + host, resolveFilename(link.url), processedDocument.toString())
                 }
             } catch (exception: Exception) {
                 logError(exception.toString())
             }
         }
+    }
+
+    private fun processDocument(document: Document?, baseUrl: String): Document? {
+        var processedDocument: Document? = null
+
+        if (document !== null && settings.scriptsDisabled) {
+            processedDocument = disableScripts(document, baseUrl)
+            processedDocument = disableEventHandlers(processedDocument, baseUrl)
+        }
+
+        return processedDocument
     }
 
     private fun isMaxDepthExceeded(depth: Int): Boolean {
